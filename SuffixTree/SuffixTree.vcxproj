@@ -153,9 +153,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="UkkonenBuilder.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Node.h" />
+    <ClInclude Include="ptr.h" />
     <ClInclude Include="SuffixTree.h" />
+    <ClInclude Include="UkkonenBuilder.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

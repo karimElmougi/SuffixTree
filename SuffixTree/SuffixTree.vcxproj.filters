@@ -18,9 +18,21 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="UkkonenBuilder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SuffixTree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UkkonenBuilder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Node.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ptr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

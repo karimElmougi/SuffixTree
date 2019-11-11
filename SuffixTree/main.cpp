@@ -1,7 +1,10 @@
 #include <iostream>
 #include "SuffixTree.h"
 
+
 int main() {
-    std::cout << "Hello World!\n";
+	const auto s = "abcabxabcd$";
+	auto tree = SuffixTree{ s };
+	tree.print_all_suffixes();
 }
 
