@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cassert>
 #include <vector>
-#include <iostream>
 #include <string>
 #include <optional>
 #include "ptr.h"
@@ -17,16 +16,14 @@ using std::string;
 using std::vector;
 using std::make_shared;
 using std::distance;
-using std::all_of;
+using std::find_if;
 using std::move;
 
 struct UkkonenNode {
 	UkkonenNode(const shared_ptr<UkkonenNode> suffix_link, const ptr<const char> begin, const ptr<const ptr<const char>> end) noexcept :
-		children{},
 		suffix_link{ suffix_link },
 		begin{ begin },
-		end{ end },
-		suffix_index{ -1 } {}
+		end{ end } {}
 	UkkonenNode(const UkkonenNode&) noexcept = default;
 	UkkonenNode(UkkonenNode&&) noexcept = default;
 	~UkkonenNode() = default;
@@ -35,7 +32,7 @@ struct UkkonenNode {
 	UkkonenNode& operator=(UkkonenNode&&) noexcept = default;
 
 	bool is_leaf() const noexcept {
-		return all_of(children.cbegin(), children.cend(), [](auto c) { return c == nullptr; });
+		return children.empty();
 	}
 
 	size_t edge_length() const noexcept {
@@ -43,11 +40,21 @@ struct UkkonenNode {
 		return distance(begin, *end) + 1;
 	}
 
-	array<shared_ptr<UkkonenNode>, 256> children;
+	void push_or_update_child(char c, shared_ptr<UkkonenNode> node) {
+		auto it = find_if(children.begin(), children.end(), [c](auto p) { return p.first == c; });
+		if (it == children.end()) {
+			children.emplace_back(c, node);
+		}
+		else {
+			it->second = node;
+		}
+	}
+
+	vector<pair<char, shared_ptr<UkkonenNode>>> children;
 	shared_ptr<UkkonenNode> suffix_link;
 	ptr<const char> begin;
 	ptr<const ptr<const char>> end;
-	int suffix_index;
+	optional<size_t> suffix_index;
 };
 
 struct ActivePoint {
@@ -62,8 +69,18 @@ struct ActivePoint {
 	ActivePoint& operator=(const ActivePoint&) noexcept = default;
 	ActivePoint& operator=(ActivePoint&&) noexcept = default;
 
+	bool active_edge_has_node() const noexcept {
+		for (auto cur = node->children.begin(); cur != node->children.end(); ++cur) {
+			if (cur->first == *edge)
+				return true;
+		}
+
+		return false;
+	}
+
 	shared_ptr<UkkonenNode>& get_node_of_active_edge() const noexcept {
-		return node->children[*edge];
+		auto c = *edge;
+		return find_if(node->children.begin(), node->children.end(), [c](auto p) { return p.first == c; })->second;
 	}
 
 	shared_ptr<UkkonenNode> node;

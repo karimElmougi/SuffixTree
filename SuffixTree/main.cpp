@@ -12,7 +12,7 @@ void test_suffix_tree() {
 	auto tree = SuffixTree{ s, '$' };
 	tree.print_all_suffixes();
 
-	cout << "\nlongest common substrings (DP):" << '\n';
+	cout << "\nlongest repeated substrings:" << '\n';
 	tree.print_longest_repeated_substring();
 }
 

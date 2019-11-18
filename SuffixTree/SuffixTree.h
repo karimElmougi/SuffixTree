@@ -15,6 +15,7 @@ using std::distance;
 
 class SuffixTree {
 public:
+	
 	SuffixTree(string&& text, const char terminator) noexcept : text{ text + terminator } {
 		auto b = UkkonenBuilder{ this->text };
 		root = b.build();
@@ -32,14 +33,14 @@ public:
 		root = b.build_generalized(terminators_str);
 	}
 
-	vector<string> get_all_suffixes() const noexcept {
-		auto suffixes = vector<string>{};
-		for_each_suffix([&suffixes](auto node) { suffixes.push_back(node->suffix()); });
-		return suffixes;
+	void print_all_suffixes() const noexcept {
+		for_each_suffix([](auto node) noexcept { cout << node->suffix() << " [" << node->suffix_index.value() << "]\n"; });
 	}
 
-	void print_all_suffixes() const noexcept {
-		for_each_suffix([](auto node) { cout << node->suffix() << " [" << node->suffix_index.value() << "]\n"; });
+	vector<string_view> get_all_suffixes() const noexcept {
+		auto suffixes = vector<string_view>{};
+		for_each_suffix([&suffixes](auto node) noexcept { suffixes.push_back(node->suffix()); });
+		return suffixes;
 	}
 
 	void print_longest_repeated_substring() const noexcept {
@@ -47,7 +48,7 @@ public:
 	}
 
 	string_view get_longest_repeated_substring(const string& text) const noexcept {
-		auto size = size_t{ 0 };
+		auto max_size = size_t{ 0 };
 		auto i = size_t{ 0 };
 
 		auto stack = vector<shared_ptr<Node>>{ root };
@@ -56,17 +57,17 @@ public:
 			const auto node = stack.back(); stack.pop_back();
 
 			if (!node->is_leaf()) {
-				for (const auto [c, child] : node->children) {
+				for (const auto& [c, child] : node->children) {
 					stack.push_back(child);
 				}
 			}
-			else if (size < node->suffix().size() - node->edge.size()) {
-				size = node->suffix().size() - node->edge.size();
+			else if (max_size < node->suffix().size() - node->edge.size()) {
+				max_size = node->suffix().size() - node->edge.size();
 				i = node->suffix_index.value();
 			}
 		}
 
-		auto view = string_view{ text.c_str() + i };
+		auto view = string_view{ text.c_str() + i, max_size + 1 };
 		view.remove_suffix(1);
 
 		return view;
@@ -77,7 +78,7 @@ public:
 
 	vector<string_view> find_longest_common_substrings_dp(const string& s, const string& t) const noexcept {
 		auto L = vector<vector<size_t>>{};
-		for (size_t i = 0; i < s.size(); ++i) L.push_back(vector<size_t>(t.size(), 0));
+		for (size_t i = 0; i < s.size(); ++i) L.emplace_back(t.size(), 0);
 
 		auto z = size_t{ 0 };
 		auto ret = vector<string_view>{};
@@ -96,12 +97,12 @@ public:
 						ret.clear();
 						const auto begin = s.c_str() + i - z + 1;
 						const auto end = s.c_str() + z + 1;
-						ret.push_back(string_view{ begin, static_cast<size_t>(distance(begin, end)) });
+						ret.emplace_back(begin, static_cast<size_t>(distance(begin, end)));
 					}
 					else if (L[i][j] == z) {
 						const auto begin = s.c_str() + i - z + 1;
 						const auto end = s.c_str() + z + 1;
-						ret.push_back(string_view{ begin, static_cast<size_t>(distance(begin, end)) });
+						ret.emplace_back(begin, static_cast<size_t>(distance(begin, end)));
 					}
 				}
 				else {
@@ -114,6 +115,7 @@ public:
 	}
 
 private:
+
 	template<typename Func>
 	void for_each_suffix(Func func) const noexcept {
 		auto stack = vector<shared_ptr<Node>>{ root };

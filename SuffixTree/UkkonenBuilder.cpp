@@ -3,18 +3,17 @@
 shared_ptr<Node> node_from_builder_node(shared_ptr<UkkonenNode> builder_node, shared_ptr<Node> parent) {
 	auto view = builder_node->begin ? string_view{ builder_node->begin, builder_node->edge_length() } : string_view{};
 	auto node = builder_node->is_leaf()
-		? make_shared<Node>(parent, move(view), builder_node->suffix_index)
+		? make_shared<Node>(parent, move(view), builder_node->suffix_index.value())
 		: make_shared<Node>(parent, move(view));
 
-	for (char c = 0; c < builder_node->children.size(); ++c) {
-		if (builder_node->children[c])
-			node->children.push_back({ c, node_from_builder_node(builder_node->children[c], node) });
+	for (auto [c, child] : builder_node->children) {
+		node->children.emplace_back(c, node_from_builder_node(child, node));
 	}
 
 	return node;
 }
 
-bool shortcut(shared_ptr<UkkonenNode> node, const ActivePoint& active_point) noexcept {
+bool shortcut(const shared_ptr<UkkonenNode> node, const ActivePoint& active_point) noexcept {
 	return active_point.length >= node->edge_length();
 }
 
@@ -23,9 +22,8 @@ void set_suffix_index(shared_ptr<UkkonenNode> n, int edge_length, const string& 
 		n->suffix_index = text.size() - edge_length;
 	}
 	else {
-		for (auto child : n->children) {
-			if (child)
-				set_suffix_index(child, edge_length + child->edge_length(), text);
+		for (auto [c, child] : n->children) {
+			set_suffix_index(child, edge_length + child->edge_length(), text);
 		}
 	}
 }
@@ -39,9 +37,9 @@ ActivePoint UkkonenBuilder::extend(const ptr< const ptr<const char>> ptr_to_curs
 		if (active_point.length == 0)
 			active_point.edge = cursor;
 
-		auto& node_of_active_edge = active_point.get_node_of_active_edge();
+		if (active_point.active_edge_has_node()) {
+			auto& node_of_active_edge = active_point.get_node_of_active_edge();
 
-		if (node_of_active_edge) {
 			// skip/count trick
 			if (shortcut(node_of_active_edge, active_point)) {
 				const auto length = node_of_active_edge->edge_length();
@@ -68,9 +66,9 @@ ActivePoint UkkonenBuilder::extend(const ptr< const ptr<const char>> ptr_to_curs
 			auto previous_child = node_of_active_edge;
 			node_of_active_edge = make_shared<UkkonenNode>(root, node_of_active_edge->begin, split_point);
 
-			node_of_active_edge->children[*cursor] = make_shared<UkkonenNode>(root, cursor, ptr_to_cursor);
+			node_of_active_edge->push_or_update_child(*cursor, make_shared<UkkonenNode>(root, cursor, ptr_to_cursor));
 			previous_child->begin += active_point.length;
-			node_of_active_edge->children[*previous_child->begin] = previous_child;
+			node_of_active_edge->push_or_update_child(*previous_child->begin, previous_child);
 
 			if (latest_active_edge_node != nullptr) {
 				latest_active_edge_node->suffix_link = node_of_active_edge;
@@ -80,7 +78,7 @@ ActivePoint UkkonenBuilder::extend(const ptr< const ptr<const char>> ptr_to_curs
 		}
 		else {
 			// Rule 2
-			node_of_active_edge = make_shared<UkkonenNode>(root, cursor, ptr_to_cursor);
+			active_point.node->push_or_update_child(*active_point.edge, make_shared<UkkonenNode>(root, cursor, ptr_to_cursor));
 
 			if (latest_active_edge_node != nullptr) {
 				latest_active_edge_node->suffix_link = active_point.node;
@@ -98,7 +96,7 @@ ActivePoint UkkonenBuilder::extend(const ptr< const ptr<const char>> ptr_to_curs
 		}
 	}
 
-	return active_point;
+	return std::move(active_point);
 }
 
 shared_ptr<Node> UkkonenBuilder::build() noexcept {
@@ -107,10 +105,10 @@ shared_ptr<Node> UkkonenBuilder::build() noexcept {
 
 	auto active_point = ActivePoint{ root, text.c_str(), 0 };
 
-	auto curr = text.c_str();
-	for (; curr != text.c_str() + text.size(); curr++)
-		active_point = extend(&curr, move(active_point));
-	curr--;
+	auto cur = text.c_str();
+	for (; cur != text.c_str() + text.size(); cur++)
+		active_point = extend(&cur, move(active_point));
+	cur--;
 
 	set_suffix_index(root, 0, text);
 
