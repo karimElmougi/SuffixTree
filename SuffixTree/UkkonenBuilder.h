@@ -14,6 +14,7 @@
 using std::array;
 using std::shared_ptr;
 using std::string;
+using std::vector;
 using std::make_shared;
 using std::distance;
 using std::all_of;
@@ -70,11 +71,13 @@ struct ActivePoint {
 	size_t length;
 };
 
-class UkkonenTreeBuilder {
+class UkkonenBuilder {
 public:
-	UkkonenTreeBuilder(const string& text) : text{ text } {}
+	UkkonenBuilder(const string& text) noexcept : text{ text } {}
 
 	shared_ptr<Node> build() noexcept;
+
+	shared_ptr<Node> build_generalized(const string& terminators) noexcept;
 
 private:
 	ActivePoint extend(const ptr< const ptr<const char>> ptr_to_cursor, ActivePoint&& active_point) noexcept;
@@ -83,4 +86,3 @@ private:
 	shared_ptr<UkkonenNode> root = nullptr;
 	size_t nb_remaining_suffixes = 0;
 };
-

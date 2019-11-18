@@ -1,14 +1,14 @@
 #include "UkkonenBuilder.h"
 
-shared_ptr<Node> node_from_builder_node(shared_ptr<UkkonenNode> builder_node) {
+shared_ptr<Node> node_from_builder_node(shared_ptr<UkkonenNode> builder_node, shared_ptr<Node> parent) {
 	auto view = builder_node->begin ? string_view{ builder_node->begin, builder_node->edge_length() } : string_view{};
 	auto node = builder_node->is_leaf()
-		? make_shared<Node>(move(view), builder_node->suffix_index)
-		: make_shared<Node>(move(view));
+		? make_shared<Node>(parent, move(view), builder_node->suffix_index)
+		: make_shared<Node>(parent, move(view));
 
 	for (char c = 0; c < builder_node->children.size(); ++c) {
 		if (builder_node->children[c])
-			node->children[c] = node_from_builder_node(builder_node->children[c]);
+			node->children.push_back({ c, node_from_builder_node(builder_node->children[c], node) });
 	}
 
 	return node;
@@ -18,19 +18,19 @@ bool shortcut(shared_ptr<UkkonenNode> node, const ActivePoint& active_point) noe
 	return active_point.length >= node->edge_length();
 }
 
-void set_suffix_index(shared_ptr<UkkonenNode> n, int label_height, const string& text) noexcept {
+void set_suffix_index(shared_ptr<UkkonenNode> n, int edge_length, const string& text) noexcept {
 	if (n->is_leaf()) {
-		n->suffix_index = text.size() - label_height;
+		n->suffix_index = text.size() - edge_length;
 	}
 	else {
-		for (auto c : n->children) {
-			if (c)
-				set_suffix_index(c, label_height + c->edge_length(), text);
+		for (auto child : n->children) {
+			if (child)
+				set_suffix_index(child, edge_length + child->edge_length(), text);
 		}
 	}
 }
 
-ActivePoint UkkonenTreeBuilder::extend(const ptr< const ptr<const char>> ptr_to_cursor, ActivePoint&& active_point) noexcept {
+ActivePoint UkkonenBuilder::extend(const ptr< const ptr<const char>> ptr_to_cursor, ActivePoint&& active_point) noexcept {
 	const auto cursor = *ptr_to_cursor;
 	nb_remaining_suffixes++;
 	shared_ptr<UkkonenNode> latest_active_edge_node = nullptr;
@@ -101,7 +101,8 @@ ActivePoint UkkonenTreeBuilder::extend(const ptr< const ptr<const char>> ptr_to_
 	return active_point;
 }
 
-shared_ptr<Node> UkkonenTreeBuilder::build() noexcept {
+shared_ptr<Node> UkkonenBuilder::build() noexcept {
+	assert(root == nullptr);
 	root = make_shared<UkkonenNode>(nullptr, nullptr, nullptr);
 
 	auto active_point = ActivePoint{ root, text.c_str(), 0 };
@@ -113,5 +114,22 @@ shared_ptr<Node> UkkonenTreeBuilder::build() noexcept {
 
 	set_suffix_index(root, 0, text);
 
-	return node_from_builder_node(root);
+	return node_from_builder_node(root, nullptr);
+}
+
+void trim(shared_ptr<Node> n, const string& terminators) noexcept {
+	const auto pos = n->edge.find_first_of(terminators);
+	if (pos != string_view::npos) {
+		n->edge.remove_suffix(n->edge.size() - pos - 1);
+	}
+
+	for (auto [c, child] : n->children) {
+		trim(child, terminators);
+	}
+}
+
+shared_ptr<Node> UkkonenBuilder::build_generalized(const string& terminators) noexcept {
+	auto root_node = build();
+	trim(root_node, terminators);
+	return root_node;
 }

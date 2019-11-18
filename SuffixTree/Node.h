@@ -6,22 +6,26 @@
 #include <iostream>
 #include <string>
 #include <optional>
+#include <utility>
 #include "ptr.h"
 
 using std::array;
 using std::shared_ptr;
+using std::string;
 using std::string_view;
 using std::vector;
+using std::pair;
 using std::optional;
 using std::cout;
 
-class Node {
-public:
-	Node(string_view&& edge) noexcept :
+struct Node {
+	Node(shared_ptr<Node> parent, string_view&& edge) noexcept :
+		parent{ parent },
 		children{},
 		edge{ edge },
 		suffix_index{}  {}
-	Node(string_view&& edge, size_t suffix_index) noexcept :
+	Node(shared_ptr<Node> parent, string_view&& edge, size_t suffix_index) noexcept :
+		parent{ parent },
 		children{},
 		edge{ edge },
 		suffix_index{ suffix_index } {}
@@ -32,40 +36,26 @@ public:
 	Node& operator=(const Node&) noexcept = default;
 	Node& operator=(Node&&) noexcept = default;
 
-	void print_all_suffixes() const noexcept {
-		auto path = vector<ptr<const Node>>{};
-		print_all_suffixes(path);
+	string suffix() const noexcept {
+		auto v = vector<string_view>{ edge };
+		for (auto curr = parent; curr; curr = curr->parent) {
+			v.push_back(curr->edge);
+		}
+
+		auto s = string{};
+
+		for (auto curr = v.crbegin(); curr != v.crend(); ++curr)
+			s += *curr;
+
+		return s;
 	}
 
 	bool is_leaf() const noexcept {
 		return suffix_index.has_value();
 	}
 
-private:
-	void print_all_suffixes(vector<ptr<const Node>>& path) const noexcept {
-		if (is_leaf()) {
-			for (auto p : path) {
-				cout << p->edge;
-			}
-
-			cout << edge << " [" << suffix_index.value() << "]\n";
-			return;
-		}
-
-		path.push_back(this);
-
-		for (auto child : children) {
-			if (child)
-				child->print_all_suffixes(path);
-		}
-
-		path.pop_back();
-	}
-
-public:
-	array<shared_ptr<Node>, 256> children;
-
-private:
+	shared_ptr<const Node> parent;
+	vector<pair<char, shared_ptr<Node>>> children;
 	string_view edge;
 	optional<size_t> suffix_index;
 };
