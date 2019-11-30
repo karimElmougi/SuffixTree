@@ -3,8 +3,8 @@
 shared_ptr<Node> node_from_builder_node(shared_ptr<UkkonenNode> builder_node, shared_ptr<Node> parent) {
 	auto view = builder_node->begin ? string_view{ builder_node->begin, builder_node->edge_length() } : string_view{};
 	auto node = builder_node->is_leaf()
-		? make_shared<Node>(parent, move(view), builder_node->suffix_index.value())
-		: make_shared<Node>(parent, move(view));
+		? make_shared<Node>(parent, view, builder_node->suffix_index.value())
+		: make_shared<Node>(parent, view);
 
 	for (auto [c, child] : builder_node->children) {
 		node->children.emplace_back(c, node_from_builder_node(child, node));

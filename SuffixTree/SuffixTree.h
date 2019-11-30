@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <algorithm>
 #include "Node.h"
 #include "UkkonenBuilder.h"
 
@@ -12,6 +13,9 @@ using std::string;
 using std::string_view;
 using std::vector;
 using std::distance;
+using std::transform;
+using std::max_element;
+using std::back_inserter;
 
 class SuffixTree {
 public:
@@ -19,9 +23,11 @@ public:
 	SuffixTree(string&& text, const char terminator) noexcept : text{ text + terminator } {
 		auto b = UkkonenBuilder{ this->text };
 		root = b.build();
+		leaves = get_leaves(root);
+		assign_terminators(leaves, { terminator });
 	}
 
-	SuffixTree(const vector<string>& strings, const vector<char>& terminators) noexcept : text{}  {
+	SuffixTree(const vector<string>& strings, const vector<char>& terminators) noexcept {
 		assert(strings.size() <= terminators.size());
 
 		const auto terminators_str = string{ terminators.cbegin(), terminators.cend() };
@@ -31,6 +37,47 @@ public:
 
 		auto b = UkkonenBuilder{ this->text };
 		root = b.build_generalized(terminators_str);
+		leaves = get_leaves(root);
+		assign_terminators(leaves, terminators_str);
+	}
+
+	bool is_substring(const string& s) const noexcept {
+		auto stack = vector<pair<shared_ptr<Node>, ptr<const char>>>{ {root, s.c_str()} };
+		const auto end = s.c_str() + s.size();
+
+		for (; !stack.empty();) {
+			auto [node, cursor] = stack.back(); stack.pop_back();
+			if (cursor == end)
+				return true;
+
+			if (node->is_leaf()) {
+				for (const auto c : node->edge) {
+					if (*cursor != c)
+						break;
+					++cursor;
+				}
+				if (cursor == end)
+					return true;
+			}
+			else {
+				for (const auto& [c, child] : node->children) {
+					if (*cursor == c) {
+						for (const auto c : child->edge) {
+							if (*cursor == c)
+								++cursor;
+							else if (cursor == end)
+								return true;
+							else
+								goto ctn;
+						}
+						stack.emplace_back(child, cursor);
+					}
+				ctn:;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	void print_all_suffixes() const noexcept {
@@ -50,7 +97,6 @@ public:
 	string_view get_longest_repeated_substring(const string& text) const noexcept {
 		auto max_size = size_t{ 0 };
 		auto i = size_t{ 0 };
-
 		auto stack = vector<shared_ptr<Node>>{ root };
 
 		for (; !stack.empty();) {
@@ -73,45 +119,35 @@ public:
 		return view;
 	}
 
-	vector<string_view> find_longest_common_substrings(const string& s, const char s_terminator, const string& t, const char t_terminator) const noexcept {
-	}
+	vector<string_view> find_all_common_substrings(const vector<char>& terminators) const noexcept {
+		auto max_size = size_t{ 0 };
+		auto i = size_t{ 0 };
+		auto stack = vector<shared_ptr<Node>>{ root };
+		auto common_nodes = vector<shared_ptr<Node>>{};
 
-	vector<string_view> find_longest_common_substrings_dp(const string& s, const string& t) const noexcept {
-		auto L = vector<vector<size_t>>{};
-		for (size_t i = 0; i < s.size(); ++i) L.emplace_back(t.size(), 0);
+		for (; !stack.empty();) {
+			const auto node = stack.back(); stack.pop_back();
 
-		auto z = size_t{ 0 };
-		auto ret = vector<string_view>{};
-
-		for (size_t i = 0; i < s.size(); ++i) {
-			for (size_t j = 0; j < t.size(); ++j) {
-				if (s[i] == t[j]) {
-					if (i == 0 || j == 0) {
-						L[i][j] = 1;
-					}
-					else {
-						L[i][j] = L[i - 1][j - 1] + 1;
-					}
-					if (L[i][j] > z) {
-						z = L[i][j];
-						ret.clear();
-						const auto begin = s.c_str() + i - z + 1;
-						const auto end = s.c_str() + z + 1;
-						ret.emplace_back(begin, static_cast<size_t>(distance(begin, end)));
-					}
-					else if (L[i][j] == z) {
-						const auto begin = s.c_str() + i - z + 1;
-						const auto end = s.c_str() + z + 1;
-						ret.emplace_back(begin, static_cast<size_t>(distance(begin, end)));
-					}
+			if (!node->is_leaf()) {
+				for (const auto& [c, child] : node->children) {
+					stack.push_back(child);
 				}
-				else {
-					L[i][j] = 0;
+
+				if (node->contains_all_terminators(terminators)) {
+					common_nodes.push_back(node);
 				}
 			}
 		}
 
-		return ret;
+		auto substrings = vector<string_view>{};
+		transform(common_nodes.cbegin(), common_nodes.cend(), back_inserter(substrings), [](auto n) { return n->suffix(); });
+		return substrings;
+	}
+
+	string_view find_longest_common_substring(const vector<char>& terminators) const noexcept {
+		const auto common_substrings = find_all_common_substrings(terminators);
+		const auto max_elem = max_element(common_substrings.cbegin(), common_substrings.cend(), [](auto a, auto b) { return a.size() < b.size(); });
+		return *max_elem;
 	}
 
 private:
@@ -134,6 +170,40 @@ private:
 		}
 	}
 
+	static vector<shared_ptr<Node>> get_leaves(shared_ptr<Node> root) noexcept {
+		auto stack = vector<shared_ptr<Node>>{ root };
+		auto leaves = vector<shared_ptr<Node>>{};
+
+		for (; !stack.empty();) {
+			const auto node = stack.back(); stack.pop_back();
+
+			if (node->is_leaf()) {
+				leaves.push_back(node);
+			}
+			else {
+				for (const auto& [c, child] : node->children) {
+					stack.push_back(child);
+				}
+			}
+		}
+
+		return leaves;
+	}
+
+	static void assign_terminators(const vector<shared_ptr<Node>> &leaves, const string& terminators) noexcept {
+		for (auto leaf : leaves) {
+			for (const auto c : leaf->edge) {
+				if (terminators.find(c) != string::npos) {
+					leaf->terminators.insert(c);
+					for (auto cur = leaf->parent; cur; cur = cur->parent) {
+						cur->terminators.insert(c);
+					}
+				}
+			}
+		}
+	}
+
 	shared_ptr<Node> root;
+	vector<shared_ptr<Node>> leaves;
 	string text;
 };
